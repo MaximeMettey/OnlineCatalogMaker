@@ -29,3 +29,14 @@ Thumbs.db
 *.tmp
 tmp/
 temp/
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
