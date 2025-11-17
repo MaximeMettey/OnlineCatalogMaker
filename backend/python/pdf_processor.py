@@ -163,11 +163,22 @@ def process_cropped_page(doc, page_index, output_page_number, output_dir, crop_r
 
 def extract_text_with_positions(page, clip_rect=None):
     """Extract text with word and paragraph positions"""
-    # Get text blocks (paragraphs)
-    blocks = page.get_text("dict", clip=clip_rect)["blocks"]
+    # Get text blocks (paragraphs) - don't use clip parameter to avoid PyMuPDF issues
+    try:
+        text_dict = page.get_text("dict")
+        blocks = text_dict.get("blocks", [])
+    except Exception as e:
+        print(f"Error getting text dict: {e}", file=sys.stderr)
+        return {'paragraphs': [], 'words': []}
 
     paragraphs = []
     words = []
+
+    # Define clip boundaries if provided
+    clip_x0 = clip_rect.x0 if clip_rect else None
+    clip_y0 = clip_rect.y0 if clip_rect else None
+    clip_x1 = clip_rect.x1 if clip_rect else None
+    clip_y1 = clip_rect.y1 if clip_rect else None
 
     for block in blocks:
         if not isinstance(block, dict):
@@ -194,14 +205,23 @@ def extract_text_with_positions(page, clip_rect=None):
                     if not span_text.strip():
                         continue
 
-                    # Adjust coordinates if clipped
+                    # Original coordinates
+                    orig_x0, orig_y0, orig_x1, orig_y1 = span_bbox
+
+                    # Filter by clip rect if provided (before adjusting coordinates)
                     if clip_rect:
-                        x0 = span_bbox[0] - clip_rect.x0
-                        y0 = span_bbox[1] - clip_rect.y0
-                        x1 = span_bbox[2] - clip_rect.x0
-                        y1 = span_bbox[3] - clip_rect.y0
+                        # Check if span is within clip boundaries
+                        if (orig_x0 < clip_x0 or orig_x0 > clip_x1 or
+                            orig_y0 < clip_y0 or orig_y0 > clip_y1):
+                            continue
+
+                        # Adjust coordinates relative to clip rect
+                        x0 = orig_x0 - clip_x0
+                        y0 = orig_y0 - clip_y0
+                        x1 = orig_x1 - clip_x0
+                        y1 = orig_y1 - clip_y0
                     else:
-                        x0, y0, x1, y1 = span_bbox
+                        x0, y0, x1, y1 = orig_x0, orig_y0, orig_x1, orig_y1
 
                     # Store word
                     word_data = {
