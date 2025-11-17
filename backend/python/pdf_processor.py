@@ -79,10 +79,16 @@ def process_single_page(pdf_path, page_index, output_page_number, output_dir):
 
     doc.close()
 
+    # Calculate paths relative to uploads directory (output_dir.parent.parent)
+    # output_dir = /path/to/uploads/catalogs/9
+    # output_dir.parent = /path/to/uploads/catalogs
+    # output_dir.parent.parent = /path/to/uploads
+    uploads_dir = output_dir.parent.parent
+
     return {
-        'pdf_path': str(pdf_path_out.relative_to(output_dir.parent)),
-        'png_path': str(png_path.relative_to(output_dir.parent)),
-        'jpg_path': str(jpg_path.relative_to(output_dir.parent)),
+        'pdf_path': str(pdf_path_out.relative_to(uploads_dir)),
+        'png_path': str(png_path.relative_to(uploads_dir)),
+        'jpg_path': str(jpg_path.relative_to(uploads_dir)),
         'width': width,
         'height': height,
         'text_data': text_data
@@ -158,10 +164,13 @@ def process_cropped_page(doc, page_index, output_page_number, output_dir, crop_r
 
     print(f"  Page {output_page_number} ({side} half) processed successfully", file=sys.stderr)
 
+    # Calculate paths relative to uploads directory (output_dir.parent.parent)
+    uploads_dir = output_dir.parent.parent
+
     return {
-        'pdf_path': str(pdf_path_out.relative_to(output_dir.parent)),
-        'png_path': str(png_path.relative_to(output_dir.parent)),
-        'jpg_path': str(jpg_path.relative_to(output_dir.parent)),
+        'pdf_path': str(pdf_path_out.relative_to(uploads_dir)),
+        'png_path': str(png_path.relative_to(uploads_dir)),
+        'jpg_path': str(jpg_path.relative_to(uploads_dir)),
         'width': width,
         'height': height,
         'text_data': text_data
