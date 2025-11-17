@@ -46,7 +46,7 @@ pip install -r python/requirements.txt
 ```
 
 **Packages installés :**
-- `pymupdf` (fitz) - Traitement PDF robuste
+- `pymupdf` - Traitement PDF robuste (remplace l'ancien `fitz` déprécié)
 - `Pillow` - Manipulation d'images
 
 ### 4. Installer les dépendances Frontend (React)
@@ -148,7 +148,7 @@ L'application utilise une architecture **Node.js + Python** :
 - Orchestration
 
 ### Service Python (PyMuPDF)
-- **Traitement PDF** : Utilise PyMuPDF (fitz) pour maximum de robustesse
+- **Traitement PDF** : Utilise PyMuPDF pour maximum de robustesse
 - **Découpage de pages** : Split des double-pages automatique
 - **Génération d'images** : PNG et JPG haute qualité
 - **Extraction de texte** : Positions précises des mots et paragraphes

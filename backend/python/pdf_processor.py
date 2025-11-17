@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-PDF Processor using PyMuPDF (fitz)
+PDF Processor using PyMuPDF
 Handles PDF splitting, image generation, and text extraction
 """
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF (import pymupdf, not fitz directly)
 import json
 import sys
 import os
@@ -170,15 +170,29 @@ def extract_text_with_positions(page, clip_rect=None):
     words = []
 
     for block in blocks:
+        if not isinstance(block, dict):
+            continue
+
         if block.get("type") == 0:  # Text block
             for line in block.get("lines", []):
+                if not isinstance(line, dict):
+                    continue
+
                 para_text = ""
                 para_bbox = None
                 para_words = []
 
                 for span in line.get("spans", []):
+                    # Ensure span is a dictionary
+                    if not isinstance(span, dict):
+                        continue
+
                     span_text = span.get("text", "")
                     span_bbox = span.get("bbox", [0, 0, 0, 0])
+
+                    # Skip empty text
+                    if not span_text.strip():
+                        continue
 
                     # Adjust coordinates if clipped
                     if clip_rect:
@@ -192,12 +206,12 @@ def extract_text_with_positions(page, clip_rect=None):
                     # Store word
                     word_data = {
                         'text': span_text,
-                        'x': x0,
-                        'y': y0,
-                        'width': x1 - x0,
-                        'height': y1 - y0,
+                        'x': float(x0),
+                        'y': float(y0),
+                        'width': float(x1 - x0),
+                        'height': float(y1 - y0),
                         'font_name': span.get('font', 'Unknown'),
-                        'font_size': span.get('size', 0)
+                        'font_size': float(span.get('size', 0))
                     }
                     words.append(word_data)
                     para_words.append(word_data)
@@ -212,13 +226,13 @@ def extract_text_with_positions(page, clip_rect=None):
                         para_bbox[2] = max(para_bbox[2], x1)
                         para_bbox[3] = max(para_bbox[3], y1)
 
-                if para_text.strip():
+                if para_text.strip() and para_bbox:
                     paragraphs.append({
                         'text': para_text.strip(),
-                        'x': para_bbox[0],
-                        'y': para_bbox[1],
-                        'width': para_bbox[2] - para_bbox[0],
-                        'height': para_bbox[3] - para_bbox[1],
+                        'x': float(para_bbox[0]),
+                        'y': float(para_bbox[1]),
+                        'width': float(para_bbox[2] - para_bbox[0]),
+                        'height': float(para_bbox[3] - para_bbox[1]),
                         'word_count': len(para_words)
                     })
 
@@ -270,10 +284,11 @@ def main():
             sys.exit(1)
 
     except Exception as e:
+        # Print error as JSON to stdout (not stderr) so Node.js can parse it
         print(json.dumps({
             'success': False,
             'error': str(e)
-        }), file=sys.stderr)
+        }))
         sys.exit(1)
 
 if __name__ == '__main__':
