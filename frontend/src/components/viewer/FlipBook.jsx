@@ -278,26 +278,24 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
         .page {
           background: white;
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-          overflow: hidden !important;
+          overflow: clip !important;
           position: relative;
           width: 100%;
           height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          contain: paint layout style;
         }
 
         .page-content {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-        }
-
-        .page-content img {
           position: absolute;
           top: 0;
           left: 0;
+          width: 100%;
+          height: 100%;
+          overflow: clip;
+          contain: paint;
+        }
+
+        .page-content img {
           width: 100%;
           height: 100%;
           object-fit: cover;
@@ -310,41 +308,52 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           background: #1f2937 !important;
           padding: 0 !important;
           border-radius: 0px;
-          overflow: visible !important;
         }
 
         .stf__block {
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
-          overflow: visible !important;
+          contain: paint;
+          overflow: clip !important;
         }
 
         .stf__page {
           background: white !important;
-          overflow: hidden !important;
+          overflow: clip !important;
+          contain: paint;
           transform-style: preserve-3d;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
         }
 
-        .stf__hardPage,
-        .stf__hardInner,
-        .stf__item {
-          overflow: hidden !important;
+        .stf__hardPage {
+          overflow: clip !important;
+          contain: paint;
         }
 
-        /* Critical: Force clipping on the actual flip elements */
+        .stf__hardInner {
+          overflow: clip !important;
+          contain: paint;
+        }
+
+        .stf__item {
+          overflow: clip !important;
+          contain: paint;
+        }
+
         .stf__hardPageWrapper {
-          overflow: hidden !important;
+          overflow: clip !important;
+          contain: paint;
         }
 
         .stf__pageWrapper {
-          overflow: hidden !important;
+          overflow: clip !important;
+          contain: paint;
         }
 
-        /* Ensure shadows don't cause overflow */
+        /* Clip any shadows that overflow */
         .stf__outerShadow,
         .stf__innerShadow {
-          clip-path: inset(0) !important;
+          display: none !important;
         }
       `}</style>
     </div>
