@@ -38,20 +38,25 @@ export class PythonPDFProcessor {
       });
 
       python.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(`Python script failed: ${stderr}`));
-          return;
-        }
-
+        // Always try to parse stdout first (errors are now in JSON on stdout)
         try {
           const result = JSON.parse(stdout);
           if (result.success === false) {
             reject(new Error(result.error || 'Python script failed'));
+          } else if (code !== 0) {
+            // Exit code is non-zero but result shows success (shouldn't happen)
+            reject(new Error(`Python script exited with code ${code}: ${stderr || 'No error message'}`));
           } else {
             resolve(result);
           }
         } catch (err) {
-          reject(new Error(`Failed to parse Python output: ${err.message}\nOutput: ${stdout}`));
+          // Failed to parse JSON
+          if (code !== 0) {
+            // Non-zero exit code and no valid JSON
+            reject(new Error(`Python script failed with code ${code}:\nstderr: ${stderr}\nstdout: ${stdout}\nParse error: ${err.message}`));
+          } else {
+            reject(new Error(`Failed to parse Python output: ${err.message}\nOutput: ${stdout}`));
+          }
         }
       });
 
