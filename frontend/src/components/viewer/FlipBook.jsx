@@ -27,54 +27,57 @@ const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, r
 
   return (
     <div ref={ref} className="page">
-      <img
-        src={`/uploads/${page.png_path}`}
-        alt={`Page ${page.page_number}`}
-        draggable={false}
-      />
-
-      {/* Highlighted Words */}
-      {pageHighlights.map((word) => (
-        <div
-          key={word.id}
-          style={{
-            position: 'absolute',
-            left: `${(word.x / page.width) * 100}%`,
-            top: `${(word.y / page.height) * 100}%`,
-            width: `${(word.width / page.width) * 100}%`,
-            height: `${(word.height / page.height) * 100}%`,
-            backgroundColor: 'rgba(255, 0, 0, 0.3)',
-            pointerEvents: 'none',
-            zIndex: 20,
-          }}
+      <div className="page-content">
+        <img
+          src={`/uploads/${page.png_path}`}
+          alt={`Page ${page.page_number}`}
+          draggable={false}
         />
-      ))}
 
-      {/* Clickable Areas */}
-      {page.areas?.map((area) => (
-        <div
-          key={area.id}
-          onClick={(e) => handleAreaClick(e, area)}
-          style={{
-            position: 'absolute',
-            left: `${(area.x / page.width) * 100}%`,
-            top: `${(area.y / page.height) * 100}%`,
-            width: `${(area.width / page.width) * 100}%`,
-            height: `${(area.height / page.height) * 100}%`,
-            cursor: 'pointer',
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            border: '1px solid transparent',
-            transition: 'all 0.2s',
-            zIndex: 10,
-          }}
-          className="hover:border-blue-400 hover:bg-blue-500/20"
-          title={area.type?.replace('_', ' ') || 'Interactive area'}
-        />
-      ))}
+        {/* Highlighted Words */}
+        {pageHighlights.map((word) => (
+          <div
+            key={word.id}
+            className="highlight-overlay"
+            style={{
+              position: 'absolute',
+              left: `${(word.x / page.width) * 100}%`,
+              top: `${(word.y / page.height) * 100}%`,
+              width: `${(word.width / page.width) * 100}%`,
+              height: `${(word.height / page.height) * 100}%`,
+              backgroundColor: 'rgba(255, 0, 0, 0.3)',
+              pointerEvents: 'none',
+              zIndex: 20,
+            }}
+          />
+        ))}
 
-      {/* Page number indicator */}
-      <div className="absolute bottom-4 right-4 bg-gray-900/70 text-white px-3 py-1 rounded text-sm">
-        {page.page_number}
+        {/* Clickable Areas */}
+        {page.areas?.map((area) => (
+          <div
+            key={area.id}
+            onClick={(e) => handleAreaClick(e, area)}
+            className="clickable-area hover:border-blue-400 hover:bg-blue-500/20"
+            style={{
+              position: 'absolute',
+              left: `${(area.x / page.width) * 100}%`,
+              top: `${(area.y / page.height) * 100}%`,
+              width: `${(area.width / page.width) * 100}%`,
+              height: `${(area.height / page.height) * 100}%`,
+              cursor: 'pointer',
+              backgroundColor: 'rgba(59, 130, 246, 0.05)',
+              border: '1px solid transparent',
+              transition: 'all 0.2s',
+              zIndex: 10,
+            }}
+            title={area.type?.replace('_', ' ') || 'Interactive area'}
+          />
+        ))}
+
+        {/* Page number indicator */}
+        <div className="absolute bottom-4 right-4 bg-gray-900/70 text-white px-3 py-1 rounded text-sm z-30">
+          {page.page_number}
+        </div>
       </div>
     </div>
   );
@@ -279,23 +282,28 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           position: relative;
           width: 100%;
           height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .page img {
+        .page-content {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+        }
+
+        .page-content img {
           position: absolute;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          object-fit: contain;
+          object-fit: cover;
           display: block;
           pointer-events: none;
           user-select: none;
-        }
-
-        .page > * {
-          max-width: 100% !important;
-          max-height: 100% !important;
         }
 
         .stf__wrapper {
@@ -319,19 +327,24 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
         }
 
         .stf__hardPage,
-        .stf__hardInner {
-          overflow: hidden !important;
-        }
-
+        .stf__hardInner,
         .stf__item {
           overflow: hidden !important;
         }
 
-        /* Force clipping on all pageflip containers */
+        /* Critical: Force clipping on the actual flip elements */
+        .stf__hardPageWrapper {
+          overflow: hidden !important;
+        }
+
+        .stf__pageWrapper {
+          overflow: hidden !important;
+        }
+
+        /* Ensure shadows don't cause overflow */
         .stf__outerShadow,
         .stf__innerShadow {
-          overflow: hidden !important;
-          clip-path: inset(0);
+          clip-path: inset(0) !important;
         }
       `}</style>
     </div>
