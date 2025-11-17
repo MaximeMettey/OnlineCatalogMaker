@@ -44,8 +44,9 @@ def process_single_page(pdf_path, page_index, output_page_number, output_dir):
     doc = fitz.open(pdf_path)
     page = doc[page_index]
 
-    # Create output directory
-    pages_dir = Path(output_dir) / 'pages'
+    # Create output directory - convert output_dir to Path
+    output_dir = Path(output_dir)
+    pages_dir = output_dir / 'pages'
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     page_prefix = f"page_{output_page_number}"
@@ -93,6 +94,9 @@ def process_double_page(pdf_path, page_index, start_page_number, output_dir):
     page = doc[page_index]
     rect = page.rect
 
+    # Convert output_dir to Path
+    output_dir = Path(output_dir)
+
     # Split into left and right halves
     half_width = rect.width / 2
 
@@ -116,7 +120,9 @@ def process_cropped_page(doc, page_index, output_page_number, output_dir, crop_r
     """Process a cropped portion of a page"""
     page = doc[page_index]
 
-    pages_dir = Path(output_dir) / 'pages'
+    # Ensure output_dir is a Path object
+    output_dir = Path(output_dir) if not isinstance(output_dir, Path) else output_dir
+    pages_dir = output_dir / 'pages'
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     page_prefix = f"page_{output_page_number}"
