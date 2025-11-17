@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { convert } from 'pdf-to-img';
+import { fromPath } from 'pdf2pic';
 import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
@@ -301,28 +301,32 @@ export class PDFProcessor {
     const outputPath = path.join(this.outputDir, 'pages');
 
     try {
-      // Convert PDF to PNG using pdf-to-img
+      // Convert PDF to PNG using pdf2pic
       const pngPath = path.join(outputPath, `${pagePrefix}.png`);
       let width = 0;
       let height = 0;
 
-      // Use pdf-to-img to convert
-      const document = await convert(pdfPath, {
-        scale: 2.0, // Higher quality
-      });
+      // Configure pdf2pic
+      const options = {
+        density: 300,           // High quality
+        saveFilename: pagePrefix,
+        savePath: outputPath,
+        format: 'png',
+        width: 2400,           // Max width for high quality
+        height: 3200,          // Max height for high quality
+      };
 
-      let pageBuffer;
-      for await (const page of document) {
-        pageBuffer = page; // Get first (and only) page
-        break;
-      }
+      const convert = fromPath(pdfPath, options);
 
-      if (pageBuffer) {
+      // Convert first page (page 1)
+      const result = await convert(1, { responseType: 'buffer' });
+
+      if (result && result.buffer) {
         // Save PNG
-        await fs.writeFile(pngPath, pageBuffer);
+        await fs.writeFile(pngPath, result.buffer);
 
         // Get dimensions and create JPG
-        const image = sharp(pageBuffer);
+        const image = sharp(result.buffer);
         const metadata = await image.metadata();
         width = metadata.width;
         height = metadata.height;
