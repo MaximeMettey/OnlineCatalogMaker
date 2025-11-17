@@ -260,7 +260,7 @@ export default function CatalogViewer() {
         )}
 
         {/* Flipbook Viewer */}
-        <div ref={viewerContainerRef} className="flex-1 flex items-center justify-center overflow-auto p-4">
+        <div ref={viewerContainerRef} className="flex-1 flex items-center justify-center overflow-auto">
           <FlipBook
             ref={flipBookRef}
             pages={pagesWithAreas}

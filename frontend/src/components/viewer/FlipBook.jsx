@@ -26,11 +26,10 @@ const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, r
   );
 
   return (
-    <div ref={ref} className="page bg-white relative overflow-hidden">
+    <div ref={ref} className="page">
       <img
         src={`/uploads/${page.png_path}`}
         alt={`Page ${page.page_number}`}
-        className="w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
 
@@ -112,12 +111,14 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
       // Use containerWidth if provided, otherwise use window width
       const baseWidth = containerWidth || window.innerWidth;
 
-      if (isMobile) {
-        // Mobile: single page width
-        const availableHeight = window.innerHeight - 180; // Header + controls + margins
-        const availableWidth = baseWidth - 40; // Side margins
+      // Calculate available space more precisely
+      // Header is ~60px, controls are ~70px, gap ~16px = ~146px total
+      const availableHeight = window.innerHeight - 146;
+      const availableWidth = baseWidth - 20; // Small margin to prevent overflow
 
-        let width = Math.min(availableWidth, 600);
+      if (isMobile) {
+        // Mobile: single page
+        let width = availableWidth * 0.9;
         let height = width * pageRatio;
 
         // If height is too large, recalculate based on height
@@ -129,12 +130,8 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
         setDimensions({ width, height });
       } else {
         // Desktop: two pages side by side
-        // Calculate available space (viewport - header - controls - margins)
-        const availableHeight = window.innerHeight - 180; // Header + controls + margins
-        const availableWidth = baseWidth - 80; // Side margins
-
-        // Calculate based on width (two pages side by side)
-        let pageWidth = availableWidth / 2;
+        // Try to maximize usage of available space
+        let pageWidth = availableWidth / 2.05; // 2.05 to account for small spacing between pages
         let pageHeight = pageWidth * pageRatio;
 
         // If height is too large, recalculate based on height
@@ -203,9 +200,9 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 h-full w-full">
+    <div className="flex flex-col items-center gap-4 h-full w-full">
       {/* Book Container */}
-      <div className="relative flex items-center justify-center flex-1">
+      <div className="relative flex items-center justify-center flex-1 w-full">
         <HTMLFlipBook
           ref={bookRef}
           width={dimensions.width}
@@ -223,10 +220,10 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           style={{}}
           startPage={0}
           drawShadow={true}
-          flippingTime={1000}
-          usePortrait={true}
+          flippingTime={800}
+          usePortrait={false}
           startZIndex={0}
-          autoSize={true}
+          autoSize={false}
           clickEventForward={true}
           useMouseEvents={true}
           swipeDistance={30}
@@ -276,16 +273,28 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
       <style>{`
         .page {
           background: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+          overflow: hidden;
+          position: relative;
+        }
+
+        .page img {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
 
         .stf__wrapper {
           background: #1f2937 !important;
-          padding: 20px;
-          border-radius: 8px;
+          padding: 0 !important;
+          border-radius: 0px;
+        }
+
+        .stf__block {
+          box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
         }
       `}</style>
     </div>
