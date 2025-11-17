@@ -67,12 +67,19 @@ export class PythonPDFProcessor {
   }
 
   async process() {
+    let textDb = null;
+
     try {
       console.log(`Starting PDF processing for catalog ${this.catalogId}`);
 
       // Create output directory
       await fs.mkdir(this.outputDir, { recursive: true });
       await fs.mkdir(path.join(this.outputDir, 'pages'), { recursive: true });
+
+      // Initialize text database for this catalog (single DB for all pages)
+      console.log('Initializing text database...');
+      await initTextDb(this.catalogId);
+      textDb = getTextDb(this.catalogId);
 
       // 1. Analyze pages for double page detection
       console.log('Analyzing PDF pages...');
@@ -99,11 +106,11 @@ export class PythonPDFProcessor {
           if (pageInfo.is_double_page) {
             // Split into two pages
             console.log(`  Splitting double page into pages ${outputPageNumber} and ${outputPageNumber + 1}`);
-            await this.processDoublePage(i, outputPageNumber);
+            await this.processDoublePage(i, outputPageNumber, textDb);
             outputPageNumber += 2;
           } else {
             // Process as single page
-            await this.processSinglePage(i, outputPageNumber);
+            await this.processSinglePage(i, outputPageNumber, textDb);
             outputPageNumber += 1;
           }
         } catch (error) {
@@ -130,10 +137,15 @@ export class PythonPDFProcessor {
       });
 
       throw error;
+    } finally {
+      // Close text database connection
+      if (textDb) {
+        await textDb.destroy();
+      }
     }
   }
 
-  async processSinglePage(pageIndex, outputPageNumber) {
+  async processSinglePage(pageIndex, outputPageNumber, textDb) {
     // Call Python to process single page
     const result = await this.callPython('process_page', [
       this.filePath,
@@ -145,7 +157,7 @@ export class PythonPDFProcessor {
     const pageData = result.result;
 
     // Save text data to SQLite
-    await this.saveTextData(outputPageNumber, pageData.text_data);
+    await this.saveTextData(outputPageNumber, pageData.text_data, textDb);
 
     // Create page record in database
     const [pageId] = await db('pages').insert({
@@ -155,7 +167,7 @@ export class PythonPDFProcessor {
       png_path: pageData.png_path,
       jpg_path: pageData.jpg_path,
       svg_path: null,
-      text_db_path: `data/page_${this.catalogId}_${outputPageNumber}.db`,
+      text_db_path: `catalogs/${this.catalogId}/text.db`,
       width: pageData.width,
       height: pageData.height,
     });
@@ -164,7 +176,7 @@ export class PythonPDFProcessor {
     return pageId;
   }
 
-  async processDoublePage(pageIndex, startPageNumber) {
+  async processDoublePage(pageIndex, startPageNumber, textDb) {
     // Call Python to process double page
     const result = await this.callPython('process_double_page', [
       this.filePath,
@@ -181,7 +193,7 @@ export class PythonPDFProcessor {
       const outputPageNumber = startPageNumber + i;
 
       // Save text data to SQLite
-      await this.saveTextData(outputPageNumber, pageData.text_data);
+      await this.saveTextData(outputPageNumber, pageData.text_data, textDb);
 
       // Create page record in database
       await db('pages').insert({
@@ -191,55 +203,49 @@ export class PythonPDFProcessor {
         png_path: pageData.png_path,
         jpg_path: pageData.jpg_path,
         svg_path: null,
-        text_db_path: `data/page_${this.catalogId}_${outputPageNumber}.db`,
+        text_db_path: `catalogs/${this.catalogId}/text.db`,
         width: pageData.width,
         height: pageData.height,
       });
     }
   }
 
-  async saveTextData(pageNumber, textData) {
-    // Initialize text database for this page
-    await initTextDb(this.catalogId, pageNumber);
-    const textDb = getTextDb(this.catalogId, pageNumber);
+  async saveTextData(pageNumber, textData, textDb) {
+    // Insert paragraphs
+    for (const para of textData.paragraphs) {
+      const [paraId] = await textDb('paragraphs').insert({
+        page_number: pageNumber,
+        text: para.text,
+        x: para.x,
+        y: para.y,
+        width: para.width,
+        height: para.height,
+        word_count: para.word_count,
+      });
 
-    try {
-      // Insert paragraphs
-      for (const para of textData.paragraphs) {
-        const [paraId] = await textDb('paragraphs').insert({
-          text: para.text,
-          x: para.x,
-          y: para.y,
-          width: para.width,
-          height: para.height,
-          word_count: para.word_count,
+      // Find words that belong to this paragraph (approximate by position)
+      const paraWords = textData.words.filter(w =>
+        w.x >= para.x && w.x <= para.x + para.width &&
+        w.y >= para.y && w.y <= para.y + para.height
+      );
+
+      // Insert words
+      for (const word of paraWords) {
+        await textDb('words').insert({
+          page_number: pageNumber,
+          text: word.text,
+          x: word.x,
+          y: word.y,
+          width: word.width,
+          height: word.height,
+          font_name: word.font_name,
+          font_size: word.font_size,
+          paragraph_id: paraId,
         });
-
-        // Find words that belong to this paragraph (approximate by position)
-        const paraWords = textData.words.filter(w =>
-          w.x >= para.x && w.x <= para.x + para.width &&
-          w.y >= para.y && w.y <= para.y + para.height
-        );
-
-        // Insert words
-        for (const word of paraWords) {
-          await textDb('words').insert({
-            text: word.text,
-            x: word.x,
-            y: word.y,
-            width: word.width,
-            height: word.height,
-            font_name: word.font_name,
-            font_size: word.font_size,
-            paragraph_id: paraId,
-          });
-        }
       }
-
-      console.log(`  Extracted text: ${textData.paragraphs.length} paragraphs, ${textData.words.length} words`);
-    } finally {
-      await textDb.destroy();
     }
+
+    console.log(`  Extracted text: ${textData.paragraphs.length} paragraphs, ${textData.words.length} words`);
   }
 }
 
