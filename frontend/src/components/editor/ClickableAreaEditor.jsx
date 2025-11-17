@@ -29,7 +29,7 @@ export default function ClickableAreaEditor({ page }) {
   const [editingArea, setEditingArea] = useState(null);
   const stageRef = useRef(null);
 
-  const imageUrl = `/${page.png_path}`;
+  const imageUrl = `/uploads/${page.png_path}`;
 
   useEffect(() => {
     loadAreas();

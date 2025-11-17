@@ -32,12 +32,13 @@ const dbConfig = {
 // Main database instance
 export const db = knex(dbConfig);
 
-// Function to create a connection to a specific text database
-export const getTextDb = (catalogId, pageNumber) => {
+// Function to create a connection to a catalog's text database
+export const getTextDb = (catalogId) => {
   const textDbPath = join(
     __dirname,
-    '../../data',
-    `page_${catalogId}_${pageNumber}.db`
+    '../../uploads/catalogs',
+    catalogId.toString(),
+    'text.db'
   );
 
   return knex({
@@ -130,21 +131,25 @@ export const initDatabase = async () => {
   }
 };
 
-// Initialize text database for a specific page
-export const initTextDb = async (catalogId, pageNumber) => {
-  const textDb = getTextDb(catalogId, pageNumber);
+// Initialize text database for a catalog
+export const initTextDb = async (catalogId) => {
+  const textDb = getTextDb(catalogId);
 
   try {
     // Paragraphs table
     if (!(await textDb.schema.hasTable('paragraphs'))) {
       await textDb.schema.createTable('paragraphs', (table) => {
         table.increments('id').primary();
+        table.integer('page_number').notNullable();
         table.text('text').notNullable();
         table.float('x').notNullable();
         table.float('y').notNullable();
         table.float('width').notNullable();
         table.float('height').notNullable();
         table.integer('word_count').defaultTo(0);
+
+        // Index for faster queries by page
+        table.index('page_number');
       });
     }
 
@@ -152,6 +157,7 @@ export const initTextDb = async (catalogId, pageNumber) => {
     if (!(await textDb.schema.hasTable('words'))) {
       await textDb.schema.createTable('words', (table) => {
         table.increments('id').primary();
+        table.integer('page_number').notNullable();
         table.text('text').notNullable();
         table.float('x').notNullable();
         table.float('y').notNullable();
@@ -162,10 +168,13 @@ export const initTextDb = async (catalogId, pageNumber) => {
         table.integer('paragraph_id').unsigned();
 
         table.foreign('paragraph_id').references('paragraphs.id').onDelete('CASCADE');
+
+        // Index for faster queries by page
+        table.index('page_number');
       });
     }
 
-    console.log(`Text database initialized for catalog ${catalogId}, page ${pageNumber}`);
+    console.log(`Text database initialized for catalog ${catalogId}`);
   } catch (error) {
     console.error('Error initializing text database:', error);
     throw error;
