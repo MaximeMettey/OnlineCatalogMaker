@@ -277,30 +277,44 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
           overflow: hidden;
           position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          width: 100%;
+          height: 100%;
         }
 
         .page img {
+          position: absolute;
+          top: 0;
+          left: 0;
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
           display: block;
+          pointer-events: none;
+          user-select: none;
         }
 
         .stf__wrapper {
           background: #1f2937 !important;
           padding: 0 !important;
           border-radius: 0px;
+          overflow: visible !important;
         }
 
         .stf__block {
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
+          overflow: visible !important;
         }
 
         .stf__page {
           background: white !important;
+          overflow: hidden !important;
+          transform-style: preserve-3d;
+          backface-visibility: hidden;
+        }
+
+        .stf__hardPage,
+        .stf__hardInner {
+          overflow: hidden !important;
         }
       `}</style>
     </div>
