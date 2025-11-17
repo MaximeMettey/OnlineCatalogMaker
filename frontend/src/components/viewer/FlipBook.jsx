@@ -3,7 +3,7 @@ import HTMLFlipBook from 'react-pageflip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Page component - must use forwardRef for react-pageflip
-const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, ref) => {
+const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [], containerDimensions }, ref) => {
   const handleAreaClick = (e, area) => {
     e.stopPropagation();
     if (onAreaClick) {
@@ -25,6 +25,27 @@ const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, r
     (word) => word.page_number === page.page_number
   );
 
+  // Calculate the actual displayed image dimensions with object-fit: contain
+  // The container has the flipbook dimensions, but the image maintains aspect ratio
+  const containerAspect = containerDimensions ? containerDimensions.width / containerDimensions.height : 1;
+  const imageAspect = page.width / page.height;
+
+  let imageDisplayWidth, imageDisplayHeight, offsetX, offsetY;
+
+  if (imageAspect > containerAspect) {
+    // Image is wider - will have top/bottom letterboxing
+    imageDisplayWidth = 100;
+    imageDisplayHeight = (containerAspect / imageAspect) * 100;
+    offsetX = 0;
+    offsetY = (100 - imageDisplayHeight) / 2;
+  } else {
+    // Image is taller - will have left/right letterboxing
+    imageDisplayHeight = 100;
+    imageDisplayWidth = (imageAspect / containerAspect) * 100;
+    offsetY = 0;
+    offsetX = (100 - imageDisplayWidth) / 2;
+  }
+
   return (
     <div ref={ref} className="page">
       <div className="page-content">
@@ -41,10 +62,10 @@ const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, r
             className="highlight-overlay"
             style={{
               position: 'absolute',
-              left: `${(word.x / page.width) * 100}%`,
-              top: `${(word.y / page.height) * 100}%`,
-              width: `${(word.width / page.width) * 100}%`,
-              height: `${(word.height / page.height) * 100}%`,
+              left: `${offsetX + (word.x / page.width) * imageDisplayWidth}%`,
+              top: `${offsetY + (word.y / page.height) * imageDisplayHeight}%`,
+              width: `${(word.width / page.width) * imageDisplayWidth}%`,
+              height: `${(word.height / page.height) * imageDisplayHeight}%`,
               backgroundColor: 'rgba(255, 0, 0, 0.3)',
               pointerEvents: 'none',
               zIndex: 20,
@@ -60,10 +81,10 @@ const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, r
             className="clickable-area hover:border-blue-400 hover:bg-blue-500/20"
             style={{
               position: 'absolute',
-              left: `${(area.x / page.width) * 100}%`,
-              top: `${(area.y / page.height) * 100}%`,
-              width: `${(area.width / page.width) * 100}%`,
-              height: `${(area.height / page.height) * 100}%`,
+              left: `${offsetX + (area.x / page.width) * imageDisplayWidth}%`,
+              top: `${offsetY + (area.y / page.height) * imageDisplayHeight}%`,
+              width: `${(area.width / page.width) * imageDisplayWidth}%`,
+              height: `${(area.height / page.height) * imageDisplayHeight}%`,
               cursor: 'pointer',
               backgroundColor: 'rgba(59, 130, 246, 0.05)',
               border: '1px solid transparent',
@@ -241,6 +262,7 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
               onAreaClick={onAreaClick}
               number={index + 1}
               highlightedWords={highlightedWords}
+              containerDimensions={dimensions}
             />
           ))}
         </HTMLFlipBook>
@@ -298,7 +320,7 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
         .page-content img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
           display: block;
           pointer-events: none;
           user-select: none;
