@@ -1,5 +1,5 @@
 import db from '../config/database.js';
-import { PDFProcessor } from '../services/pdf/processor.js';
+import { PythonPDFProcessor } from '../services/pdf/pythonProcessor.js';
 import slugify from 'slugify';
 import path from 'path';
 import fs from 'fs/promises';
@@ -34,7 +34,7 @@ export const uploadCatalog = async (req, res) => {
 
     // Start PDF processing asynchronously
     const uploadDir = path.resolve('./uploads');
-    const processor = new PDFProcessor(catalogId, req.file.path, uploadDir);
+    const processor = new PythonPDFProcessor(catalogId, req.file.path, uploadDir);
 
     // Process in background
     processor.process().catch((error) => {

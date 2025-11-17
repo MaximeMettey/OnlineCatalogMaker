@@ -1,5 +1,5 @@
 import db, { getTextDb } from '../config/database.js';
-import { PDFProcessor } from '../services/pdf/processor.js';
+import { PythonPDFProcessor } from '../services/pdf/pythonProcessor.js';
 import fs from 'fs/promises';
 import path from 'path';
 import Joi from 'joi';
@@ -128,7 +128,7 @@ export const insertPages = async (req, res) => {
 
     // Create a temporary processor to process the new pages
     const uploadDir = path.resolve('./uploads');
-    const tempProcessor = new PDFProcessor(catalogId, req.file.path, uploadDir);
+    const tempProcessor = new PythonPDFProcessor(catalogId, req.file.path, uploadDir);
 
     // Load the PDF to get page count
     const { PDFDocument } = await import('pdf-lib');
@@ -213,7 +213,7 @@ export const replacePage = async (req, res) => {
     await db('clickable_areas').where({ page_id: pageId }).delete();
 
     // Process new page
-    const tempProcessor = new PDFProcessor(catalogId, req.file.path, uploadDir);
+    const tempProcessor = new PythonPDFProcessor(catalogId, req.file.path, uploadDir);
 
     const { PDFDocument } = await import('pdf-lib');
     const pdfBytes = await fs.readFile(req.file.path);

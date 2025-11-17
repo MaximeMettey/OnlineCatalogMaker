@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { fromPath } from 'pdf2pic';
+import { createCanvas } from 'canvas';
 import sharp from 'sharp';
 import fs from 'fs/promises';
 import path from 'path';
@@ -301,44 +301,42 @@ export class PDFProcessor {
     const outputPath = path.join(this.outputDir, 'pages');
 
     try {
-      // Convert PDF to PNG using pdf2pic
+      // Load PDF with pdfjs-dist
+      const pdfData = await fs.readFile(pdfPath);
+      const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+      const pdfDoc = await loadingTask.promise;
+      const page = await pdfDoc.getPage(1); // First page
+
+      // Set scale for high quality (2x for retina)
+      const scale = 2.0;
+      const viewport = page.getViewport({ scale });
+
+      // Create canvas
+      const canvas = createCanvas(viewport.width, viewport.height);
+      const context = canvas.getContext('2d');
+
+      // Render PDF page to canvas
+      await page.render({
+        canvasContext: context,
+        viewport: viewport,
+      }).promise;
+
+      // Convert canvas to PNG buffer
+      const pngBuffer = canvas.toBuffer('image/png');
       const pngPath = path.join(outputPath, `${pagePrefix}.png`);
-      let width = 0;
-      let height = 0;
+      await fs.writeFile(pngPath, pngBuffer);
 
-      // Configure pdf2pic
-      const options = {
-        density: 300,           // High quality
-        saveFilename: pagePrefix,
-        savePath: outputPath,
-        format: 'png',
-        width: 2400,           // Max width for high quality
-        height: 3200,          // Max height for high quality
-      };
+      // Get dimensions
+      const width = viewport.width;
+      const height = viewport.height;
 
-      const convert = fromPath(pdfPath, options);
+      // Convert to JPG using sharp
+      const jpgPath = path.join(outputPath, `${pagePrefix}.jpg`);
+      await sharp(pngBuffer)
+        .jpeg({ quality: 90 })
+        .toFile(jpgPath);
 
-      // Convert first page (page 1)
-      const result = await convert(1, { responseType: 'buffer' });
-
-      if (result && result.buffer) {
-        // Save PNG
-        await fs.writeFile(pngPath, result.buffer);
-
-        // Get dimensions and create JPG
-        const image = sharp(result.buffer);
-        const metadata = await image.metadata();
-        width = metadata.width;
-        height = metadata.height;
-
-        // Convert to JPG
-        const jpgPath = path.join(outputPath, `${pagePrefix}.jpg`);
-        await image.jpeg({ quality: 90 }).toFile(jpgPath);
-
-        return { pngPath, jpgPath, width, height };
-      } else {
-        throw new Error('Failed to convert PDF page to image');
-      }
+      return { pngPath, jpgPath, width, height };
     } catch (error) {
       console.error('Image generation error:', error);
       throw error;
