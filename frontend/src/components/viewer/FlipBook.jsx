@@ -1,9 +1,9 @@
-import { useRef, forwardRef, useEffect, useState } from 'react';
+import { useRef, forwardRef, useEffect, useState, useImperativeHandle } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Page component - must use forwardRef for react-pageflip
-const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
+const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, ref) => {
   const handleAreaClick = (e, area) => {
     e.stopPropagation();
     if (onAreaClick) {
@@ -20,14 +20,35 @@ const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
     );
   }
 
+  // Filter highlighted words for this page
+  const pageHighlights = highlightedWords.filter(
+    (word) => word.page_number === page.page_number
+  );
+
   return (
-    <div ref={ref} className="page bg-white relative overflow-hidden">
+    <div ref={ref} className="page">
       <img
         src={`/uploads/${page.png_path}`}
         alt={`Page ${page.page_number}`}
-        className="w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
+
+      {/* Highlighted Words */}
+      {pageHighlights.map((word) => (
+        <div
+          key={word.id}
+          style={{
+            position: 'absolute',
+            left: `${(word.x / page.width) * 100}%`,
+            top: `${(word.y / page.height) * 100}%`,
+            width: `${(word.width / page.width) * 100}%`,
+            height: `${(word.height / page.height) * 100}%`,
+            backgroundColor: 'rgba(255, 0, 0, 0.3)',
+            pointerEvents: 'none',
+            zIndex: 20,
+          }}
+        />
+      ))}
 
       {/* Clickable Areas */}
       {page.areas?.map((area) => (
@@ -61,31 +82,72 @@ const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
 
 Page.displayName = 'Page';
 
-export default function FlipBook({ pages, onPageChange, onAreaClick }) {
+const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWords = [], containerWidth }, ref) => {
   const bookRef = useRef();
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [dimensions, setDimensions] = useState({ width: 550, height: 733 });
 
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    goToPage: (pageIndex) => {
+      if (bookRef.current) {
+        bookRef.current.pageFlip().flip(pageIndex);
+      }
+    },
+  }));
+
   useEffect(() => {
-    // Calculate responsive dimensions
+    // Calculate responsive dimensions based on first page ratio
     const updateDimensions = () => {
-      const maxWidth = Math.min(window.innerWidth * 0.9, 1200);
+      if (pages.length === 0) return;
+
+      // Get the ratio from the first page (all pages should have similar ratios)
+      const firstPage = pages[0];
+      const pageRatio = firstPage.height / firstPage.width; // height/width ratio (usually ~1.4 for A4)
+
       const isMobile = window.innerWidth < 1024;
 
+      // Use containerWidth if provided, otherwise use window width
+      const baseWidth = containerWidth || window.innerWidth;
+
+      // Calculate available space more precisely
+      // Header is ~60px, controls are ~70px, gap ~16px = ~146px total
+      const availableHeight = window.innerHeight - 146;
+      const availableWidth = baseWidth - 20; // Small margin to prevent overflow
+
       if (isMobile) {
-        setDimensions({ width: maxWidth, height: maxWidth * 1.4 });
+        // Mobile: single page
+        let width = availableWidth * 0.9;
+        let height = width * pageRatio;
+
+        // If height is too large, recalculate based on height
+        if (height > availableHeight) {
+          height = availableHeight;
+          width = height / pageRatio;
+        }
+
+        setDimensions({ width, height });
       } else {
-        // Desktop: half width for each page
-        const pageWidth = maxWidth / 2;
-        setDimensions({ width: pageWidth, height: pageWidth * 1.4 });
+        // Desktop: two pages side by side
+        // Try to maximize usage of available space
+        let pageWidth = availableWidth / 2.05; // 2.05 to account for small spacing between pages
+        let pageHeight = pageWidth * pageRatio;
+
+        // If height is too large, recalculate based on height
+        if (pageHeight > availableHeight) {
+          pageHeight = availableHeight;
+          pageWidth = pageHeight / pageRatio;
+        }
+
+        setDimensions({ width: pageWidth, height: pageHeight });
       }
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [pages, containerWidth]);
 
   useEffect(() => {
     if (pages.length > 0) {
@@ -138,18 +200,18 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full max-w-7xl mx-auto px-4">
+    <div className="flex flex-col items-center gap-4 h-full w-full">
       {/* Book Container */}
-      <div className="relative flex items-center justify-center w-full">
+      <div className="relative flex items-center justify-center flex-1 w-full">
         <HTMLFlipBook
           ref={bookRef}
           width={dimensions.width}
           height={dimensions.height}
           size="stretch"
-          minWidth={315}
-          maxWidth={1000}
-          minHeight={400}
-          maxHeight={1533}
+          minWidth={200}
+          maxWidth={2000}
+          minHeight={280}
+          maxHeight={2800}
           maxShadowOpacity={0.5}
           showCover={true}
           mobileScrollSupport={false}
@@ -158,10 +220,10 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
           style={{}}
           startPage={0}
           drawShadow={true}
-          flippingTime={1000}
-          usePortrait={true}
+          flippingTime={800}
+          usePortrait={false}
           startZIndex={0}
-          autoSize={true}
+          autoSize={false}
           clickEventForward={true}
           useMouseEvents={true}
           swipeDistance={30}
@@ -174,24 +236,25 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
               page={page}
               onAreaClick={onAreaClick}
               number={index + 1}
+              highlightedWords={highlightedWords}
             />
           ))}
         </HTMLFlipBook>
       </div>
 
       {/* Navigation Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-shrink-0">
         <button
           onClick={goToPrevPage}
           disabled={currentPage === 0}
-          className="p-3 bg-gray-700 hover:bg-gray-600 text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+          className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
           aria-label="Previous page"
         >
-          <ChevronLeft size={24} />
+          <ChevronLeft size={20} />
         </button>
 
-        <div className="bg-gray-800 text-white px-8 py-3 rounded-full shadow-lg min-w-[180px] text-center">
-          <span className="font-medium text-lg">
+        <div className="bg-gray-800 text-white px-6 py-2 rounded-full shadow-lg min-w-[140px] text-center">
+          <span className="font-medium">
             {currentPage + 1} / {totalPages}
           </span>
         </div>
@@ -199,34 +262,45 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
         <button
           onClick={goToNextPage}
           disabled={currentPage >= totalPages - 1}
-          className="p-3 bg-gray-700 hover:bg-gray-600 text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+          className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
           aria-label="Next page"
         >
-          <ChevronRight size={24} />
+          <ChevronRight size={20} />
         </button>
-      </div>
-
-      {/* Instructions */}
-      <div className="text-gray-400 text-sm text-center">
-        <p>Cliquez sur les coins des pages ou utilisez les flèches pour feuilleter</p>
       </div>
 
       {/* Custom styles for pages */}
       <style>{`
         .page {
           background: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+          overflow: hidden;
+          position: relative;
+        }
+
+        .page img {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
 
         .stf__wrapper {
           background: #1f2937 !important;
-          padding: 20px;
-          border-radius: 8px;
+          padding: 0 !important;
+          border-radius: 0px;
+        }
+
+        .stf__block {
+          box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
         }
       `}</style>
     </div>
   );
-}
+});
+
+FlipBook.displayName = 'FlipBook';
+
+export default FlipBook;
