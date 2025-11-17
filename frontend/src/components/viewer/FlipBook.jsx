@@ -1,9 +1,9 @@
-import { useRef, forwardRef, useEffect, useState } from 'react';
+import { useRef, forwardRef, useEffect, useState, useImperativeHandle } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Page component - must use forwardRef for react-pageflip
-const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
+const Page = forwardRef(({ page, onAreaClick, number, highlightedWords = [] }, ref) => {
   const handleAreaClick = (e, area) => {
     e.stopPropagation();
     if (onAreaClick) {
@@ -20,6 +20,11 @@ const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
     );
   }
 
+  // Filter highlighted words for this page
+  const pageHighlights = highlightedWords.filter(
+    (word) => word.page_number === page.page_number
+  );
+
   return (
     <div ref={ref} className="page bg-white relative overflow-hidden">
       <img
@@ -28,6 +33,23 @@ const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
         className="w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
+
+      {/* Highlighted Words */}
+      {pageHighlights.map((word) => (
+        <div
+          key={word.id}
+          style={{
+            position: 'absolute',
+            left: `${(word.x / page.width) * 100}%`,
+            top: `${(word.y / page.height) * 100}%`,
+            width: `${(word.width / page.width) * 100}%`,
+            height: `${(word.height / page.height) * 100}%`,
+            backgroundColor: 'rgba(255, 0, 0, 0.3)',
+            pointerEvents: 'none',
+            zIndex: 20,
+          }}
+        />
+      ))}
 
       {/* Clickable Areas */}
       {page.areas?.map((area) => (
@@ -61,24 +83,39 @@ const Page = forwardRef(({ page, onAreaClick, number }, ref) => {
 
 Page.displayName = 'Page';
 
-export default function FlipBook({ pages, onPageChange, onAreaClick }) {
+const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWords = [] }, ref) => {
   const bookRef = useRef();
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [dimensions, setDimensions] = useState({ width: 550, height: 733 });
 
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    goToPage: (pageIndex) => {
+      if (bookRef.current) {
+        bookRef.current.pageFlip().flip(pageIndex);
+      }
+    },
+  }));
+
   useEffect(() => {
-    // Calculate responsive dimensions
+    // Calculate responsive dimensions based on available viewport height
     const updateDimensions = () => {
-      const maxWidth = Math.min(window.innerWidth * 0.9, 1200);
+      // Get available height (viewport height minus header and controls)
+      const availableHeight = window.innerHeight - 200; // Subtract header and controls height
+      const availableWidth = window.innerWidth;
       const isMobile = window.innerWidth < 1024;
 
       if (isMobile) {
-        setDimensions({ width: maxWidth, height: maxWidth * 1.4 });
+        const maxWidth = Math.min(availableWidth * 0.9, 600);
+        const height = Math.min(maxWidth * 1.4, availableHeight);
+        setDimensions({ width: maxWidth, height });
       } else {
-        // Desktop: half width for each page
+        // Desktop: calculate based on available space
+        const maxWidth = Math.min(availableWidth * 0.8, 1400);
         const pageWidth = maxWidth / 2;
-        setDimensions({ width: pageWidth, height: pageWidth * 1.4 });
+        const height = Math.min(pageWidth * 1.4, availableHeight);
+        setDimensions({ width: pageWidth, height });
       }
     };
 
@@ -174,6 +211,7 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
               page={page}
               onAreaClick={onAreaClick}
               number={index + 1}
+              highlightedWords={highlightedWords}
             />
           ))}
         </HTMLFlipBook>
@@ -229,4 +267,8 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
       `}</style>
     </div>
   );
-}
+});
+
+FlipBook.displayName = 'FlipBook';
+
+export default FlipBook;

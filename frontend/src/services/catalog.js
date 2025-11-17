@@ -98,6 +98,13 @@ export const catalogService = {
     const response = await api.get(`/viewer/${slug}/pages/${pageNum}`);
     return response.data;
   },
+
+  searchCatalog: async (slug, query) => {
+    const response = await api.get(`/viewer/${slug}/search`, {
+      params: { query },
+    });
+    return response.data;
+  },
 };
 
 export default catalogService;

@@ -3,6 +3,7 @@ import {
   getCatalogBySlug,
   getViewerPages,
   getViewerPage,
+  searchCatalogText,
 } from '../controllers/viewerController.js';
 
 const router = express.Router();
@@ -11,5 +12,6 @@ const router = express.Router();
 router.get('/:slug', getCatalogBySlug);
 router.get('/:slug/pages', getViewerPages);
 router.get('/:slug/pages/:pageNum', getViewerPage);
+router.get('/:slug/search', searchCatalogText);
 
 export default router;

@@ -80,4 +80,74 @@ export const getViewerPage = async (req, res) => {
   }
 };
 
-export default { getCatalogBySlug, getViewerPages, getViewerPage };
+export const searchCatalogText = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { query } = req.query;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Get catalog
+    const catalog = await db('catalogs').where({ slug, status: 'ready' }).first();
+    if (!catalog) {
+      return res.status(404).json({ error: 'Catalog not found' });
+    }
+
+    // Import getTextDb function
+    const { getTextDb } = await import('../config/database.js');
+    const textDb = getTextDb(catalog.id);
+
+    try {
+      // Search for words matching the query (case-insensitive)
+      const searchTerm = query.trim().toLowerCase();
+      const words = await textDb('words')
+        .whereRaw('LOWER(text) LIKE ?', [`%${searchTerm}%`])
+        .select('id', 'page_number', 'text', 'x', 'y', 'width', 'height');
+
+      // Group results by page
+      const resultsByPage = {};
+      let totalOccurrences = 0;
+
+      words.forEach((word) => {
+        if (!resultsByPage[word.page_number]) {
+          resultsByPage[word.page_number] = {
+            pageNumber: word.page_number,
+            occurrences: 0,
+            words: [],
+          };
+        }
+        resultsByPage[word.page_number].occurrences++;
+        resultsByPage[word.page_number].words.push({
+          id: word.id,
+          text: word.text,
+          x: word.x,
+          y: word.y,
+          width: word.width,
+          height: word.height,
+        });
+        totalOccurrences++;
+      });
+
+      // Convert to array and sort by page number
+      const results = Object.values(resultsByPage).sort(
+        (a, b) => a.pageNumber - b.pageNumber
+      );
+
+      res.json({
+        query: searchTerm,
+        totalOccurrences,
+        totalPages: results.length,
+        results,
+      });
+    } finally {
+      await textDb.destroy();
+    }
+  } catch (error) {
+    console.error('Search catalog text error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export default { getCatalogBySlug, getViewerPages, getViewerPage, searchCatalogText };
