@@ -37,21 +37,37 @@ export class PDFProcessor {
 
       console.log(`PDF has ${pageCount} pages`);
 
+      // Analyze pages to detect double pages
+      const pageStructure = await this.analyzePages(pdfDoc);
+      const totalOutputPages = pageStructure.reduce((sum, p) => sum + (p.isDoublePage ? 2 : 1), 0);
+
+      console.log(`Detected ${totalOutputPages} output pages (${pageStructure.filter(p => p.isDoublePage).length} double pages will be split)`);
+
       // Update catalog with page count
       await db('catalogs').where({ id: this.catalogId }).update({
-        total_pages: pageCount,
+        total_pages: totalOutputPages,
         status: 'processing',
       });
 
-      // Process each page
+      // Process each page (with splitting for double pages)
+      let outputPageNumber = 1;
       for (let i = 0; i < pageCount; i++) {
-        const pageNumber = i + 1;
-        console.log(`Processing page ${pageNumber}/${pageCount}`);
+        const pageInfo = pageStructure[i];
+        console.log(`Processing source page ${i + 1}/${pageCount} (output page ${outputPageNumber})`);
 
         try {
-          await this.processPage(pdfDoc, pdfBytes, i, pageNumber);
+          if (pageInfo.isDoublePage) {
+            // Split into two pages
+            console.log(`  Splitting double page into pages ${outputPageNumber} and ${outputPageNumber + 1}`);
+            await this.processDoublePage(pdfDoc, pdfBytes, i, outputPageNumber);
+            outputPageNumber += 2;
+          } else {
+            // Process as single page
+            await this.processPage(pdfDoc, pdfBytes, i, outputPageNumber);
+            outputPageNumber += 1;
+          }
         } catch (error) {
-          console.error(`Error processing page ${pageNumber}:`, error);
+          console.error(`Error processing page ${i + 1}:`, error);
           throw error;
         }
       }
@@ -63,7 +79,7 @@ export class PDFProcessor {
       });
 
       console.log(`PDF processing completed for catalog ${this.catalogId}`);
-      return { success: true, pageCount };
+      return { success: true, pageCount: totalOutputPages };
     } catch (error) {
       console.error('PDF processing error:', error);
 
@@ -73,6 +89,169 @@ export class PDFProcessor {
         error_message: error.message,
       });
 
+      throw error;
+    }
+  }
+
+  async analyzePages(pdfDoc) {
+    const pageCount = pdfDoc.getPageCount();
+    const pageStructure = [];
+
+    for (let i = 0; i < pageCount; i++) {
+      const page = pdfDoc.getPage(i);
+      const { width, height } = page.getSize();
+      const aspectRatio = width / height;
+
+      // Consider it a double page if:
+      // 1. Width is significantly larger than height (landscape)
+      // 2. Aspect ratio > 1.5 (indicating two pages side by side)
+      const isDoublePage = aspectRatio > 1.5;
+
+      pageStructure.push({
+        index: i,
+        width,
+        height,
+        aspectRatio,
+        isDoublePage,
+      });
+
+      if (isDoublePage) {
+        console.log(`  Page ${i + 1}: ${width}x${height} (ratio: ${aspectRatio.toFixed(2)}) - DOUBLE PAGE`);
+      }
+    }
+
+    return pageStructure;
+  }
+
+  async processDoublePage(pdfDoc, pdfBytes, pageIndex, startPageNumber) {
+    // Extract the double page
+    const page = pdfDoc.getPage(pageIndex);
+    const { width, height } = page.getSize();
+
+    // Split into left and right halves
+    const halfWidth = width / 2;
+
+    // Create left page
+    await this.processSplitPage(pdfDoc, pdfBytes, pageIndex, startPageNumber, 0, 0, halfWidth, height, 'left');
+
+    // Create right page
+    await this.processSplitPage(pdfDoc, pdfBytes, pageIndex, startPageNumber + 1, halfWidth, 0, halfWidth, height, 'right');
+  }
+
+  async processSplitPage(pdfDoc, pdfBytes, pageIndex, outputPageNumber, cropX, cropY, cropWidth, cropHeight, side) {
+    const pagePrefix = `page_${outputPageNumber}`;
+
+    // 1. Extract and crop the page
+    const croppedPdf = await this.extractAndCropPage(pdfDoc, pageIndex, cropX, cropY, cropWidth, cropHeight);
+    const pdfPath = path.join(this.outputDir, 'pages', `${pagePrefix}.pdf`);
+    await fs.writeFile(pdfPath, croppedPdf);
+
+    // 2. Generate images
+    const { pngPath, jpgPath, width, height } = await this.generateImages(pdfPath, pagePrefix);
+
+    // 3. Extract text with coordinates (adjusted for crop)
+    const textDbPath = await this.extractTextFromCrop(pdfBytes, pageIndex, outputPageNumber, cropX, cropY, cropWidth, cropHeight);
+
+    // 4. Create page record
+    const [pageId] = await db('pages').insert({
+      catalog_id: this.catalogId,
+      page_number: outputPageNumber,
+      pdf_path: path.relative(this.uploadDir, pdfPath),
+      png_path: path.relative(this.uploadDir, pngPath),
+      jpg_path: path.relative(this.uploadDir, jpgPath),
+      svg_path: null,
+      text_db_path: textDbPath,
+      width,
+      height,
+    });
+
+    console.log(`  Page ${outputPageNumber} (${side} half) processed successfully (ID: ${pageId})`);
+    return pageId;
+  }
+
+  async extractAndCropPage(pdfDoc, pageIndex, cropX, cropY, cropWidth, cropHeight) {
+    const newPdf = await PDFDocument.create();
+    const [copiedPage] = await newPdf.copyPages(pdfDoc, [pageIndex]);
+
+    // Set crop box to extract only the specified region
+    copiedPage.setCropBox(cropX, cropY, cropWidth, cropHeight);
+    copiedPage.setMediaBox(cropX, cropY, cropWidth, cropHeight);
+
+    newPdf.addPage(copiedPage);
+    return await newPdf.save();
+  }
+
+  async extractTextFromCrop(pdfBytes, pageIndex, outputPageNumber, cropX, cropY, cropWidth, cropHeight) {
+    try {
+      await initTextDb(this.catalogId, outputPageNumber);
+
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+      const pdf = await loadingTask.promise;
+      const page = await pdf.getPage(pageIndex + 1);
+
+      const textContent = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1.0 });
+
+      const textDb = getTextDb(this.catalogId, outputPageNumber);
+
+      try {
+        // Filter items that fall within the crop region and adjust coordinates
+        const filteredItems = textContent.items.filter(item => {
+          const x = item.transform[4];
+          const y = viewport.height - item.transform[5];
+          return x >= cropX && x < (cropX + cropWidth) && y >= cropY && y < (cropY + cropHeight);
+        });
+
+        // Adjust coordinates relative to crop
+        const adjustedItems = filteredItems.map(item => ({
+          ...item,
+          transform: [
+            ...item.transform.slice(0, 4),
+            item.transform[4] - cropX, // Adjust X
+            item.transform[5] - cropY  // Adjust Y
+          ]
+        }));
+
+        // Create adjusted viewport for the cropped area
+        const croppedViewport = {
+          width: cropWidth,
+          height: cropHeight
+        };
+
+        const paragraphs = this.groupIntoParagraphs(adjustedItems, croppedViewport);
+
+        for (const para of paragraphs) {
+          const [paraId] = await textDb('paragraphs').insert({
+            text: para.text,
+            x: para.x,
+            y: para.y,
+            width: para.width,
+            height: para.height,
+            word_count: para.words.length,
+          });
+
+          for (const word of para.words) {
+            await textDb('words').insert({
+              text: word.text,
+              x: word.x,
+              y: word.y,
+              width: word.width,
+              height: word.height,
+              font_name: word.fontName,
+              font_size: word.fontSize,
+              paragraph_id: paraId,
+            });
+          }
+        }
+
+        console.log(`    Extracted text: ${paragraphs.length} paragraphs`);
+      } finally {
+        await textDb.destroy();
+      }
+
+      return `data/page_${this.catalogId}_${outputPageNumber}.db`;
+    } catch (error) {
+      console.error('Text extraction error:', error);
       throw error;
     }
   }

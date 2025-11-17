@@ -16,6 +16,7 @@ import authRoutes from './routes/authRoutes.js';
 import catalogRoutes from './routes/catalogRoutes.js';
 import clickableAreaRoutes from './routes/clickableAreaRoutes.js';
 import viewerRoutes from './routes/viewerRoutes.js';
+import pageManagementRoutes from './routes/pageManagementRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -58,6 +59,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/catalogs', catalogRoutes);
 app.use('/api/admin', clickableAreaRoutes);
+app.use('/api/admin', pageManagementRoutes);
 app.use('/api/viewer', viewerRoutes);
 
 // 404 handler

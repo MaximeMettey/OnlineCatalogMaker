@@ -45,6 +45,44 @@ export const catalogService = {
     return response.data;
   },
 
+  // Page management endpoints
+  deletePage: async (pageId) => {
+    const response = await api.delete(`/admin/pages/${pageId}`);
+    return response.data;
+  },
+
+  reorderPages: async (catalogId, pageOrders) => {
+    const response = await api.put(`/admin/catalogs/${catalogId}/pages/reorder`, {
+      pageOrders,
+    });
+    return response.data;
+  },
+
+  insertPages: async (catalogId, position, file) => {
+    const formData = new FormData();
+    formData.append('pdf', file);
+    formData.append('position', position);
+
+    const response = await api.post(`/admin/catalogs/${catalogId}/pages/insert`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  replacePage: async (pageId, file) => {
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    const response = await api.put(`/admin/pages/${pageId}/replace`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Viewer endpoints (public)
   getViewerCatalog: async (slug) => {
     const response = await api.get(`/viewer/${slug}`);

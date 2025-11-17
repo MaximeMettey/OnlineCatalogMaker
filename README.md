@@ -5,8 +5,15 @@ A web-based SaaS platform for creating interactive PDF catalogs with clickable a
 ## Features
 
 - **PDF Upload & Processing**: Upload PDF files and automatically split into individual pages
+- **Double Page Detection**: Automatically detects and splits double-page spreads (landscape pages) into two separate pages for consistent flipbook viewing
 - **Image Generation**: Generate PNG, JPG, and SVG versions of each page
 - **Text Extraction**: Extract text with precise positioning (words and paragraphs) into separate SQLite databases
+- **Page Management**: Comprehensive page management tools:
+  - Drag-and-drop reordering of pages
+  - Delete pages
+  - Insert pages from another PDF at any position
+  - Replace individual pages
+  - Thumbnail view for easy management
 - **Interactive Editor**: Live visual editor for creating clickable areas on pages
 - **Clickable Areas**: Support for multiple interaction types:
   - External links (open in new tab or iframe)
@@ -151,8 +158,16 @@ OnlineCatalogMaker/
   - Extract text with positioning
   - Create a unique URL slug for the catalog
 
-### 3. Edit Pages with Clickable Areas
-- Once processing is complete (status: "ready"), click the Edit icon
+### 3. Manage Pages
+- Click the Edit icon on a catalog
+- Switch to the "Manage Pages" tab
+- **Reorder pages**: Drag and drop page thumbnails to reorder
+- **Delete pages**: Click the trash icon on any page
+- **Insert pages**: Click "Insert Pages" to add pages from another PDF at a specific position
+- **Replace pages**: Click "Replace" on any page to replace it with a new PDF page
+
+### 4. Edit Pages with Clickable Areas
+- In the catalog editor, use the "Edit Clickable Areas" tab
 - Use the page navigation to select a page
 - Click "Draw New Area" to enter drawing mode
 - Click and drag on the page to create a clickable area
@@ -163,7 +178,7 @@ OnlineCatalogMaker/
   - **Audio**: Audio file URL with autoplay option
   - **Video**: Video URL, provider, and display mode
 
-### 4. View the Public Catalog
+### 5. View the Public Catalog
 - Click the "View" icon to open the public viewer
 - The catalog URL will be: `/viewer/{slug}`
 - Share this URL with your audience
@@ -184,6 +199,10 @@ OnlineCatalogMaker/
 - `GET /api/admin/catalogs/:id/pages` - Get all pages
 - `GET /api/admin/catalogs/:id/pages/:pageNum` - Get page details
 - `GET /api/admin/catalogs/:id/pages/:pageNum/text` - Get extracted text
+- `DELETE /api/admin/pages/:pageId` - Delete a page
+- `PUT /api/admin/catalogs/:catalogId/pages/reorder` - Reorder pages
+- `POST /api/admin/catalogs/:catalogId/pages/insert` - Insert pages from PDF
+- `PUT /api/admin/pages/:pageId/replace` - Replace a page with new PDF
 - `POST /api/admin/pages/:pageId/areas` - Create clickable area
 - `PUT /api/admin/areas/:id` - Update clickable area
 - `DELETE /api/admin/areas/:id` - Delete clickable area
