@@ -15,7 +15,22 @@ export default function CatalogViewer() {
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [highlightedWords, setHighlightedWords] = useState([]);
+  const [containerWidth, setContainerWidth] = useState(null);
   const flipBookRef = useRef();
+  const viewerContainerRef = useRef();
+
+  useEffect(() => {
+    // Calculate container width for FlipBook
+    const updateContainerWidth = () => {
+      if (viewerContainerRef.current) {
+        setContainerWidth(viewerContainerRef.current.offsetWidth);
+      }
+    };
+
+    updateContainerWidth();
+    window.addEventListener('resize', updateContainerWidth);
+    return () => window.removeEventListener('resize', updateContainerWidth);
+  }, [searchResults]); // Recalculate when search results change (sidebar appears/disappears)
 
   useEffect(() => {
     loadCatalog();
@@ -245,11 +260,12 @@ export default function CatalogViewer() {
         )}
 
         {/* Flipbook Viewer */}
-        <div className="flex-1 overflow-auto">
+        <div ref={viewerContainerRef} className="flex-1 flex items-center justify-center overflow-auto p-4">
           <FlipBook
             ref={flipBookRef}
             pages={pagesWithAreas}
             highlightedWords={highlightedWords}
+            containerWidth={containerWidth}
             onAreaClick={handleAreaClick}
             onPageChange={(pageIndex) => {
               console.log('Page changed to:', pageIndex);
