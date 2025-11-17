@@ -96,7 +96,12 @@ export default function CatalogViewer() {
     const pageIndex = pagesWithAreas.findIndex((p) => p.page_number === pageNumber);
     if (pageIndex >= 0 && flipBookRef.current) {
       flipBookRef.current.goToPage(pageIndex);
-      setHighlightedWords(words);
+      // Add page_number to each word so the filter works in FlipBook
+      const wordsWithPageNumber = words.map(word => ({
+        ...word,
+        page_number: pageNumber
+      }));
+      setHighlightedWords(wordsWithPageNumber);
     }
   };
 

@@ -275,7 +275,7 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
         .page {
           background: white;
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-          overflow: hidden;
+          overflow: hidden !important;
           position: relative;
           width: 100%;
           height: 100%;
@@ -291,6 +291,11 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           display: block;
           pointer-events: none;
           user-select: none;
+        }
+
+        .page > * {
+          max-width: 100% !important;
+          max-height: 100% !important;
         }
 
         .stf__wrapper {
@@ -310,11 +315,23 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           overflow: hidden !important;
           transform-style: preserve-3d;
           backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
         }
 
         .stf__hardPage,
         .stf__hardInner {
           overflow: hidden !important;
+        }
+
+        .stf__item {
+          overflow: hidden !important;
+        }
+
+        /* Force clipping on all pageflip containers */
+        .stf__outerShadow,
+        .stf__innerShadow {
+          overflow: hidden !important;
+          clip-path: inset(0);
         }
       `}</style>
     </div>
