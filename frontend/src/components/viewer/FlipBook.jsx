@@ -1,68 +1,49 @@
-import { useEffect, useRef, useState } from 'react';
-import { PageFlip } from 'page-flip';
+import { useState, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function FlipBook({ pages, onPageChange, onAreaClick }) {
-  const flipBookRef = useRef(null);
-  const pageFlipRef = useRef(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [isReady, setIsReady] = useState(false);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [flipDirection, setFlipDirection] = useState(null);
 
-  useEffect(() => {
-    if (!flipBookRef.current || pages.length === 0) return;
+  const handlePrevPage = () => {
+    if (currentPageIndex > 0 && !isFlipping) {
+      setIsFlipping(true);
+      setFlipDirection('prev');
+      setTimeout(() => {
+        setCurrentPageIndex(currentPageIndex - 1);
+        if (onPageChange) {
+          onPageChange(currentPageIndex - 1);
+        }
+        setTimeout(() => {
+          setIsFlipping(false);
+          setFlipDirection(null);
+        }, 300);
+      }, 300);
+    }
+  };
 
-    // Initialize PageFlip
-    const pageFlip = new PageFlip(flipBookRef.current, {
-      width: 550, // Base page width
-      height: 733, // Base page height (A4 ratio)
-      size: 'stretch',
-      minWidth: 315,
-      maxWidth: 1000,
-      minHeight: 400,
-      maxHeight: 1350,
-      maxShadowOpacity: 0.5,
-      showCover: true,
-      mobileScrollSupport: false,
-      swipeDistance: 30,
-      clickEventForward: true,
-      usePortrait: true,
-      startPage: 0,
-      autoSize: true,
-      showPageCorners: true,
-      disableFlipByClick: false,
-    });
+  const handleNextPage = () => {
+    if (currentPageIndex < pages.length - 1 && !isFlipping) {
+      setIsFlipping(true);
+      setFlipDirection('next');
+      setTimeout(() => {
+        setCurrentPageIndex(currentPageIndex + 1);
+        if (onPageChange) {
+          onPageChange(currentPageIndex + 1);
+        }
+        setTimeout(() => {
+          setIsFlipping(false);
+          setFlipDirection(null);
+        }, 300);
+      }, 300);
+    }
+  };
 
-    pageFlipRef.current = pageFlip;
-
-    // Load book
-    pageFlip.loadFromHTML(document.querySelectorAll('.page'));
-
-    // Event listeners
-    pageFlip.on('flip', (e) => {
-      const newPage = e.data;
-      setCurrentPage(newPage);
-      if (onPageChange) {
-        onPageChange(newPage);
-      }
-    });
-
-    pageFlip.on('changeOrientation', (e) => {
-      pageFlip.updateState();
-    });
-
-    setIsReady(true);
-
-    return () => {
-      if (pageFlipRef.current) {
-        pageFlipRef.current.destroy();
-      }
-    };
-  }, [pages, onPageChange]);
-
-  const handleAreaClick = (e, area, pageData) => {
-    // Stop event from triggering page flip
+  const handleAreaClick = (e, area) => {
     e.stopPropagation();
     if (onAreaClick) {
-      onAreaClick(area, pageData);
+      onAreaClick(area, pages[currentPageIndex]);
     }
   };
 
@@ -74,66 +55,149 @@ export default function FlipBook({ pages, onPageChange, onAreaClick }) {
     );
   }
 
-  return (
-    <div className="flex flex-col items-center gap-4">
-      {/* FlipBook Container */}
-      <div
-        ref={flipBookRef}
-        className="shadow-2xl"
-        style={{
-          maxWidth: '100%',
-          margin: '0 auto',
-        }}
-      >
-        {pages.map((page, index) => (
-          <div
-            key={page.id}
-            className="page bg-white relative"
-            data-density="hard"
-          >
-            <div className="relative w-full h-full">
-              {/* Page Image */}
-              <img
-                src={`/uploads/${page.png_path}`}
-                alt={`Page ${page.page_number}`}
-                className="w-full h-full object-contain"
-                draggable={false}
-              />
+  const currentPage = pages[currentPageIndex];
 
-              {/* Clickable Areas Overlay */}
-              {page.areas?.map((area) => (
-                <div
-                  key={area.id}
-                  onClick={(e) => handleAreaClick(e, area, page)}
-                  style={{
-                    position: 'absolute',
-                    left: `${(area.x / page.width) * 100}%`,
-                    top: `${(area.y / page.height) * 100}%`,
-                    width: `${(area.width / page.width) * 100}%`,
-                    height: `${(area.height / page.height) * 100}%`,
-                    cursor: 'pointer',
-                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                    border: '1px solid transparent',
-                    transition: 'all 0.2s',
-                    zIndex: 10,
-                  }}
-                  className="hover:border-blue-400 hover:bg-blue-500/20"
-                  title={area.type?.replace('_', ' ') || 'Interactive area'}
-                />
-              ))}
-            </div>
+  return (
+    <div className="flex flex-col items-center gap-6">
+      {/* Book Container with Page Flip Animation */}
+      <div className="relative perspective-1000">
+        <div
+          className={`relative bg-white shadow-2xl rounded-lg overflow-hidden transition-all duration-600 ${
+            isFlipping
+              ? flipDirection === 'next'
+                ? 'animate-flip-next'
+                : 'animate-flip-prev'
+              : ''
+          }`}
+          style={{
+            maxWidth: '900px',
+            minHeight: '600px',
+            transformStyle: 'preserve-3d',
+          }}
+        >
+          {/* Current Page */}
+          <div className="relative w-full h-full">
+            <img
+              src={`/uploads/${currentPage.png_path}`}
+              alt={`Page ${currentPage.page_number}`}
+              className="w-full h-full object-contain"
+              style={{ maxHeight: '80vh' }}
+              draggable={false}
+            />
+
+            {/* Clickable Areas Overlay */}
+            {currentPage.areas?.map((area) => (
+              <div
+                key={area.id}
+                onClick={(e) => handleAreaClick(e, area)}
+                style={{
+                  position: 'absolute',
+                  left: `${(area.x / currentPage.width) * 100}%`,
+                  top: `${(area.y / currentPage.height) * 100}%`,
+                  width: `${(area.width / currentPage.width) * 100}%`,
+                  height: `${(area.height / currentPage.height) * 100}%`,
+                  cursor: 'pointer',
+                  backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                  border: '1px solid transparent',
+                  transition: 'all 0.2s',
+                  zIndex: 10,
+                }}
+                className="hover:border-blue-400 hover:bg-blue-500/20"
+                title={area.type?.replace('_', ' ') || 'Interactive area'}
+              />
+            ))}
           </div>
-        ))}
+
+          {/* Navigation Buttons Overlay */}
+          {currentPageIndex > 0 && (
+            <button
+              onClick={handlePrevPage}
+              disabled={isFlipping}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700/90 text-white rounded-full shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed z-20"
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={28} />
+            </button>
+          )}
+
+          {currentPageIndex < pages.length - 1 && (
+            <button
+              onClick={handleNextPage}
+              disabled={isFlipping}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-gray-800/80 hover:bg-gray-700/90 text-white rounded-full shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed z-20"
+              aria-label="Next page"
+            >
+              <ChevronRight size={28} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Page Counter */}
-      {isReady && (
-        <div className="bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg">
+      {/* Page Counter and Navigation */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handlePrevPage}
+          disabled={currentPageIndex === 0 || isFlipping}
+          className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <div className="bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg min-w-[140px] text-center">
           <span className="font-medium">
-            Page {currentPage + 1} / {pages.length}
+            Page {currentPageIndex + 1} / {pages.length}
           </span>
         </div>
-      )}
+
+        <button
+          onClick={handleNextPage}
+          disabled={currentPageIndex === pages.length - 1 || isFlipping}
+          className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
+      {/* Add custom CSS for flip animation */}
+      <style>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+
+        @keyframes flip-next {
+          0% {
+            transform: rotateY(0deg);
+          }
+          50% {
+            transform: rotateY(-90deg);
+            opacity: 0.3;
+          }
+          100% {
+            transform: rotateY(0deg);
+          }
+        }
+
+        @keyframes flip-prev {
+          0% {
+            transform: rotateY(0deg);
+          }
+          50% {
+            transform: rotateY(90deg);
+            opacity: 0.3;
+          }
+          100% {
+            transform: rotateY(0deg);
+          }
+        }
+
+        .animate-flip-next {
+          animation: flip-next 0.6s ease-in-out;
+        }
+
+        .animate-flip-prev {
+          animation: flip-prev 0.6s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }
