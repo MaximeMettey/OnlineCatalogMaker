@@ -155,7 +155,7 @@ export default function PageManagement({ catalogId, pages, onPagesChanged }) {
 
             {/* Thumbnail */}
             <img
-              src={`/${page.png_path}`}
+              src={`/uploads/${page.png_path}`}
               alt={`Page ${page.page_number}`}
               className="w-full h-32 object-contain bg-gray-100 rounded mb-2"
             />

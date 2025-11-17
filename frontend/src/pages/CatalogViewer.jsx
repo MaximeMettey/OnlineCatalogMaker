@@ -166,7 +166,7 @@ export default function CatalogViewer() {
           {currentPage && currentPageData && (
             <div className="relative">
               <img
-                src={`/${currentPage.png_path}`}
+                src={`/uploads/${currentPage.png_path}`}
                 alt={`Page ${currentPageIndex + 1}`}
                 className="max-w-full h-auto shadow-2xl"
               />
