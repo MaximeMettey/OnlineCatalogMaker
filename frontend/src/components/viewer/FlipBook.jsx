@@ -131,12 +131,13 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
       } else {
         // Desktop: two pages side by side
         // Try to maximize usage of available space
-        let pageWidth = availableWidth / 2.05; // 2.05 to account for small spacing between pages
+        // Account for the gap between pages and some margin
+        let pageWidth = (availableWidth - 40) / 2; // 40px total for spacing
         let pageHeight = pageWidth * pageRatio;
 
         // If height is too large, recalculate based on height
         if (pageHeight > availableHeight) {
-          pageHeight = availableHeight;
+          pageHeight = availableHeight * 0.95; // Use 95% of available height
           pageWidth = pageHeight / pageRatio;
         }
 
@@ -207,10 +208,10 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           ref={bookRef}
           width={dimensions.width}
           height={dimensions.height}
-          size="stretch"
-          minWidth={200}
+          size="fixed"
+          minWidth={400}
           maxWidth={2000}
-          minHeight={280}
+          minHeight={500}
           maxHeight={2800}
           maxShadowOpacity={0.5}
           showCover={true}
@@ -220,7 +221,7 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           style={{}}
           startPage={0}
           drawShadow={true}
-          flippingTime={800}
+          flippingTime={600}
           usePortrait={false}
           startZIndex={0}
           autoSize={false}
@@ -276,15 +277,16 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
           overflow: hidden;
           position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .page img {
-          position: absolute;
-          top: 0;
-          left: 0;
           width: 100%;
           height: 100%;
-          object-fit: contain;
+          object-fit: cover;
+          display: block;
         }
 
         .stf__wrapper {
@@ -295,6 +297,10 @@ const FlipBook = forwardRef(({ pages, onPageChange, onAreaClick, highlightedWord
 
         .stf__block {
           box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .stf__page {
+          background: white !important;
         }
       `}</style>
     </div>
