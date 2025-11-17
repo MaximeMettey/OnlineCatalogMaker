@@ -163,16 +163,14 @@ def process_cropped_page(doc, page_index, output_page_number, output_dir, crop_r
 
 def extract_text_with_positions(page, clip_rect=None):
     """Extract text with word and paragraph positions"""
-    # Get text blocks (paragraphs) - don't use clip parameter to avoid PyMuPDF issues
+    # Use get_text("words") which is more robust in PyMuPDF 1.26+
     try:
-        text_dict = page.get_text("dict")
-        blocks = text_dict.get("blocks", [])
+        word_list = page.get_text("words")
     except Exception as e:
-        print(f"Error getting text dict: {e}", file=sys.stderr)
+        print(f"Error getting text: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return {'paragraphs': [], 'words': []}
-
-    paragraphs = []
-    words = []
 
     # Define clip boundaries if provided
     clip_x0 = clip_rect.x0 if clip_rect else None
@@ -180,81 +178,77 @@ def extract_text_with_positions(page, clip_rect=None):
     clip_x1 = clip_rect.x1 if clip_rect else None
     clip_y1 = clip_rect.y1 if clip_rect else None
 
-    for block in blocks:
-        if not isinstance(block, dict):
+    words = []
+    paragraphs = []
+
+    # Group words into paragraphs by Y position
+    current_para = None
+    last_y = None
+    line_threshold = 5.0  # pixels
+
+    for word_tuple in word_list:
+        # word_tuple format: (x0, y0, x1, y1, "word", block_no, line_no, word_no)
+        if len(word_tuple) < 5:
             continue
 
-        if block.get("type") == 0:  # Text block
-            for line in block.get("lines", []):
-                if not isinstance(line, dict):
-                    continue
+        orig_x0, orig_y0, orig_x1, orig_y1, text = word_tuple[:5]
 
-                para_text = ""
-                para_bbox = None
-                para_words = []
+        # Skip empty text
+        if not text.strip():
+            continue
 
-                for span in line.get("spans", []):
-                    # Ensure span is a dictionary
-                    if not isinstance(span, dict):
-                        continue
+        # Filter by clip rect if provided
+        if clip_rect:
+            if (orig_x0 < clip_x0 or orig_x0 > clip_x1 or
+                orig_y0 < clip_y0 or orig_y0 > clip_y1):
+                continue
 
-                    span_text = span.get("text", "")
-                    span_bbox = span.get("bbox", [0, 0, 0, 0])
+            # Adjust coordinates relative to clip rect
+            x0 = orig_x0 - clip_x0
+            y0 = orig_y0 - clip_y0
+            x1 = orig_x1 - clip_x0
+            y1 = orig_y1 - clip_y0
+        else:
+            x0, y0, x1, y1 = orig_x0, orig_y0, orig_x1, orig_y1
 
-                    # Skip empty text
-                    if not span_text.strip():
-                        continue
+        # Create word entry
+        word_data = {
+            'text': text,
+            'x': float(x0),
+            'y': float(y0),
+            'width': float(x1 - x0),
+            'height': float(y1 - y0),
+            'font_name': 'Unknown',  # get_text("words") doesn't provide font info
+            'font_size': float(y1 - y0)  # Approximate font size from height
+        }
+        words.append(word_data)
 
-                    # Original coordinates
-                    orig_x0, orig_y0, orig_x1, orig_y1 = span_bbox
+        # Group into paragraphs by Y position
+        if last_y is None or abs(y0 - last_y) > line_threshold:
+            # Start new paragraph
+            if current_para:
+                paragraphs.append(current_para)
 
-                    # Filter by clip rect if provided (before adjusting coordinates)
-                    if clip_rect:
-                        # Check if span is within clip boundaries
-                        if (orig_x0 < clip_x0 or orig_x0 > clip_x1 or
-                            orig_y0 < clip_y0 or orig_y0 > clip_y1):
-                            continue
+            current_para = {
+                'text': text,
+                'x': float(x0),
+                'y': float(y0),
+                'width': float(x1 - x0),
+                'height': float(y1 - y0),
+                'word_count': 1
+            }
+        else:
+            # Continue current paragraph
+            current_para['text'] += ' ' + text
+            current_para['width'] = max(current_para['width'], x1 - current_para['x'])
+            current_para['height'] = max(current_para['height'], y1 - y0)
+            current_para['word_count'] += 1
 
-                        # Adjust coordinates relative to clip rect
-                        x0 = orig_x0 - clip_x0
-                        y0 = orig_y0 - clip_y0
-                        x1 = orig_x1 - clip_x0
-                        y1 = orig_y1 - clip_y0
-                    else:
-                        x0, y0, x1, y1 = orig_x0, orig_y0, orig_x1, orig_y1
+        last_y = y0
 
-                    # Store word
-                    word_data = {
-                        'text': span_text,
-                        'x': float(x0),
-                        'y': float(y0),
-                        'width': float(x1 - x0),
-                        'height': float(y1 - y0),
-                        'font_name': span.get('font', 'Unknown'),
-                        'font_size': float(span.get('size', 0))
-                    }
-                    words.append(word_data)
-                    para_words.append(word_data)
-
-                    para_text += span_text + " "
-
-                    if para_bbox is None:
-                        para_bbox = [x0, y0, x1, y1]
-                    else:
-                        para_bbox[0] = min(para_bbox[0], x0)
-                        para_bbox[1] = min(para_bbox[1], y0)
-                        para_bbox[2] = max(para_bbox[2], x1)
-                        para_bbox[3] = max(para_bbox[3], y1)
-
-                if para_text.strip() and para_bbox:
-                    paragraphs.append({
-                        'text': para_text.strip(),
-                        'x': float(para_bbox[0]),
-                        'y': float(para_bbox[1]),
-                        'width': float(para_bbox[2] - para_bbox[0]),
-                        'height': float(para_bbox[3] - para_bbox[1]),
-                        'word_count': len(para_words)
-                    })
+    # Add last paragraph
+    if current_para:
+        paragraphs.append(current_para)
 
     return {
         'paragraphs': paragraphs,
